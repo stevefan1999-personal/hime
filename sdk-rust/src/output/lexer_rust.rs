@@ -110,7 +110,7 @@ pub fn write(
     if compress_automata {
         writeln!(
             writer,
-            r#"include_flate::flate!(static LEXER_AUTOMATON: [u8] from "{bin_name}");"#
+            r#"include_flate::flate!(static LEXER_AUTOMATON: [u8] from "{bin_name}" on "OUT_DIR");"#
         )?;
     } else {
         writeln!(
