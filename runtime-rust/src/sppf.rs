@@ -758,7 +758,7 @@ impl SppfImplNodeReplaceable {
     ) -> usize {
         let result;
         (self.versions, result) =
-            std::mem::take(&mut self.versions).with_new_version(label, children, actions);
+            core::mem::take(&mut self.versions).with_new_version(label, children, actions);
         result
     }
 
