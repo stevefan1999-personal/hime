@@ -482,7 +482,7 @@ fn write_code_ast_visitor(
         }
         writeln!(
             writer,
-            "    fn on_terminal_{}(&self, node: &AstNode) {{}}",
+            "    fn on_terminal_{}(&mut self, node: &AstNode) {{}}",
             to_snake_case(&terminal.name)
         )?;
     }
@@ -492,14 +492,14 @@ fn write_code_ast_visitor(
         }
         writeln!(
             writer,
-            "    fn on_variable_{}(&self, node: &AstNode) {{}}",
+            "    fn on_variable_{}(&mut self, node: &AstNode) {{}}",
             to_snake_case(&variable.name)
         )?;
     }
     for symbol in &grammar.virtuals {
         writeln!(
             writer,
-            "    fn on_virtual_{}(&self, node: &AstNode) {{}}",
+            "    fn on_virtual_{}(&mut self, node: &AstNode) {{}}",
             to_snake_case(&symbol.name)
         )?;
     }
@@ -508,7 +508,7 @@ fn write_code_ast_visitor(
     writeln!(writer, "/// Walk the AST of a result using a visitor")?;
     writeln!(
         writer,
-        "pub fn visit_ast(result: &ParseResult<AstImpl>, visitor: &dyn AstVisitor) {{"
+        "pub fn visit_ast(result: &ParseResult<AstImpl>, visitor: &mut dyn AstVisitor) {{"
     )?;
     writeln!(writer, "    let ast = result.get_ast();")?;
     writeln!(writer, "    let root = ast.get_root();")?;
@@ -521,7 +521,7 @@ fn write_code_ast_visitor(
     )?;
     writeln!(
         writer,
-        "pub fn visit_ast_node(node: AstNode, visitor: &dyn AstVisitor) {{"
+        "pub fn visit_ast_node(node: AstNode, visitor: &mut dyn AstVisitor) {{"
     )?;
     writeln!(writer, "    let children = node.children();")?;
     writeln!(writer, "    for child in children.iter() {{")?;
@@ -628,15 +628,15 @@ fn write_code_sppf_visitor(
         "pub fn visit_sppf_node(node: SppfNode, visitor: &mut Box<dyn SppfVisitor>) {{"
     )?;
 
-    writeln!(writer, "    if node.versions_count() == 1 {{")?;
-    writeln!(writer, "        let version = node.first_version();")?;
-    writeln!(writer, "        visit_sppf_version_node(version, visitor);")?;
-    writeln!(writer, "    }} else {{")?;
+    writeln!(writer, "    if node.versions_count() > 1 {{")?;
     writeln!(writer, "        let versions = node.versions();")?;
     writeln!(writer, "        for version in versions {{")?;
     writeln!(writer, "            let mut visitor = clone_box(&**visitor);")?;
     writeln!(writer, "            visit_sppf_version_node(version, &mut visitor);")?;
     writeln!(writer, "        }}")?;
+    writeln!(writer, "    }} else {{")?;
+    writeln!(writer, "        let version = node.first_version();")?;
+    writeln!(writer, "        visit_sppf_version_node(version, visitor);")?;
     writeln!(writer, "    }}")?;
     writeln!(writer, "}}")?;
     writeln!(writer)?;
@@ -649,10 +649,6 @@ fn write_code_sppf_visitor(
         writer,
         "pub fn visit_sppf_version_node(node: SppfNodeVersion, visitor: &mut Box<dyn SppfVisitor>) {{"
     )?;
-    writeln!(writer, "    let children = node.children();")?;
-    writeln!(writer, "    for child in children {{")?;
-    writeln!(writer, "        visit_sppf_node(child, visitor);")?;
-    writeln!(writer, "    }}")?;
     writeln!(writer, "    match node.get_symbol().id {{")?;
     for terminal_ref in &expected.content {
         let Some(terminal) = grammar.get_terminal(terminal_ref.sid()) else {
@@ -689,6 +685,10 @@ fn write_code_sppf_visitor(
     }
     writeln!(writer, "        _ => ()")?;
     writeln!(writer, "    }};")?;
+    writeln!(writer, "    let children = node.children();")?;
+    writeln!(writer, "    for child in children {{")?;
+    writeln!(writer, "        visit_sppf_node(child, visitor);")?;
+    writeln!(writer, "    }}")?;
     writeln!(writer, "}}")?;
     Ok(())
 }
