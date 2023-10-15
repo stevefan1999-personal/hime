@@ -472,7 +472,7 @@ fn write_code_ast_visitor(
     writeln!(writer)?;
     writeln!(writer, "/// Visitor interface")?;
     writeln!(writer, "#[allow(unused_variables)]")?;
-    writeln!(writer, "pub trait Visitor {{")?;
+    writeln!(writer, "pub trait AstVisitor {{")?;
     for terminal_ref in &expected.content {
         let Some(terminal) = grammar.get_terminal(terminal_ref.sid()) else {
             continue;
