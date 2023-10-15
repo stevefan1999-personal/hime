@@ -611,7 +611,7 @@ fn write_code_sppf_visitor(
     writeln!(writer, "/// Walk the AST of a result using a visitor")?;
     writeln!(
         writer,
-        "pub fn visit_sppf(result: &ParseResult<SppfImpl>, visitor: Box<dyn SppfVisitor>) {{"
+        "pub fn visit_sppf(result: &ParseResult<SppfImpl>, visitor: &Box<dyn SppfVisitor>) {{"
     )?;
     writeln!(writer, "    let sppf = result.get_ast();")?;
     writeln!(writer, "    let root = sppf.get_root();")?;
@@ -628,15 +628,14 @@ fn write_code_sppf_visitor(
         "pub fn visit_sppf_node(node: SppfNode, visitor: &Box<dyn SppfVisitor>) {{"
     )?;
 
-    writeln!(writer, "      if node.versions_count() == 1 {{")?;
-    writeln!(writer, "            let version = node.first_version();")?;
-    writeln!(writer, "            visit_sppf_version_node(version, visitor);")?;
-    writeln!(writer, "      }} else {{")?;
-    writeln!(writer, "            let versions = node.versions();")?;
-    writeln!(writer, "            for version in versions {{")?;
-    writeln!(writer, "                let visitor = clone_box(&**visitor);")?;
-    writeln!(writer, "                visit_sppf_version_node(version, &visitor);")?;
-    writeln!(writer, "            }}")?;
+    writeln!(writer, "    if node.versions_count() == 1 {{")?;
+    writeln!(writer, "        let version = node.first_version();")?;
+    writeln!(writer, "        visit_sppf_version_node(version, visitor);")?;
+    writeln!(writer, "    }} else {{")?;
+    writeln!(writer, "        let versions = node.versions();")?;
+    writeln!(writer, "        for version in versions {{")?;
+    writeln!(writer, "            let visitor = clone_box(&**visitor);")?;
+    writeln!(writer, "            visit_sppf_version_node(version, &visitor);")?;
     writeln!(writer, "        }}")?;
     writeln!(writer, "    }}")?;
     writeln!(writer, "}}")?;
