@@ -22,7 +22,7 @@ use alloc::vec::Vec;
 
 use super::subtree::SubTree;
 use super::{
-    get_op_code_base, get_op_code_tree_action, read_table_u16, read_u16, ContextProvider, LRAction,
+    get_op_code_base, get_op_code_tree_action, read_table, read_u16, ContextProvider, LRAction,
     LRActionCode, LRColumnMap, LRContexts, LRExpected, LRProduction, Parser, Symbol, TreeAction,
     LR_ACTION_CODE_ACCEPT, LR_ACTION_CODE_NONE, LR_ACTION_CODE_REDUCE, LR_ACTION_CODE_SHIFT,
     LR_OP_CODE_BASE_ADD_VIRTUAL, LR_OP_CODE_BASE_SEMANTIC_ACTION, TREE_ACTION_DROP,
@@ -36,7 +36,7 @@ use crate::symbols::{SemanticBody, SemanticElement, SemanticElementTrait};
 
 /// Represents the LR(k) parsing table and productions
 #[derive(Clone)]
-pub struct LRkAutomaton {
+pub struct LRkAutomaton<'a> {
     /// The number of columns in the LR table
     columns_count: usize,
     /// The number of states in the LR table
@@ -46,15 +46,15 @@ pub struct LRkAutomaton {
     /// The contexts information
     contexts: Vec<LRContexts>,
     /// The LR table
-    table: Vec<u16>,
+    table: &'a [u16],
     /// The table of LR productions
-    productions: Vec<LRProduction>,
+    productions: Vec<LRProduction<'a>>,
 }
 
-impl LRkAutomaton {
+impl<'a> LRkAutomaton<'a> {
     /// Initializes a new automaton from the given binary data
     #[must_use]
-    pub fn new(data: &[u8]) -> LRkAutomaton {
+    pub fn new(data: &'a [u8]) -> LRkAutomaton<'a> {
         let columns_count = read_u16(data, 0) as usize;
         let states_count = read_u16(data, 2) as usize;
         let productions_count = read_u16(data, 4) as usize;
@@ -71,7 +71,7 @@ impl LRkAutomaton {
             }
             contexts.push(context);
         }
-        let table = read_table_u16(data, index, states_count * columns_count * 2);
+        let table = read_table(&data[index..], states_count * columns_count * 2).unwrap();
         index += states_count * columns_count * 4;
         let mut productions = Vec::with_capacity(productions_count);
         for _i in 0..productions_count {
@@ -400,9 +400,9 @@ struct LRkHead {
     identifier: u32,
 }
 
-struct LRkParserData<'s, 'a> {
+struct LRkParserData<'aut, 's, 'a> {
     /// The parser's automaton
-    automaton: LRkAutomaton,
+    automaton: LRkAutomaton<'aut>,
     /// The parser's stack
     stack: Vec<LRkHead>,
     /// The grammar variables
@@ -411,7 +411,7 @@ struct LRkParserData<'s, 'a> {
     actions: &'a mut dyn FnMut(usize, Symbol, &dyn SemanticBody),
 }
 
-impl<'s, 'a> ContextProvider for LRkParserData<'s, 'a> {
+impl<'aut, 's, 'a> ContextProvider for LRkParserData<'aut, 's, 'a> {
     /// Gets the priority of the specified context required by the specified terminal
     /// The priority is an unsigned integer. The lesser the value the higher the priority.
     /// The absence of value represents the unavailability of the required context.
@@ -520,7 +520,7 @@ impl<'s, 'a> ContextProvider for LRkParserData<'s, 'a> {
     }
 }
 
-impl<'s, 't, 'a> LRkParserData<'s, 'a> {
+impl<'aut, 's, 't, 'a> LRkParserData<'aut, 's, 'a> {
     /// Checks whether the specified terminal is indeed expected for a reduction
     /// This check is required because in the case of a base LALR graph,
     /// some terminals expected for reduction in the automaton are coming from other paths.
@@ -631,23 +631,23 @@ impl<'s, 't, 'a> LRkParserData<'s, 'a> {
 }
 
 /// Represents a base for all LR(k) parsers
-pub struct LRkParser<'s, 't, 'a> {
+pub struct LRkParser<'aut, 's, 't, 'a> {
     /// The parser's data
-    data: LRkParserData<'s, 'a>,
+    data: LRkParserData<'aut, 's, 'a>,
     /// The AST builder
     builder: LRkAstBuilder<'s, 't, 'a>,
 }
 
-impl<'s, 't, 'a> LRkParser<'s, 't, 'a> {
+impl<'aut, 's, 't, 'a> LRkParser<'aut, 's, 't, 'a> {
     /// Initializes a new instance of the parser
     pub fn new(
         lexer: &'a mut Lexer<'s, 't, 'a>,
         variables: &'a [Symbol<'s>],
         virtuals: &'a [Symbol<'s>],
-        automaton: LRkAutomaton,
+        automaton: LRkAutomaton<'aut>,
         ast: &'a mut AstImpl,
         actions: &'a mut dyn FnMut(usize, Symbol, &dyn SemanticBody),
-    ) -> LRkParser<'s, 't, 'a> {
+    ) -> LRkParser<'aut, 's, 't, 'a> {
         LRkParser {
             data: LRkParserData {
                 automaton,
@@ -702,7 +702,7 @@ impl<'s, 't, 'a> LRkParser<'s, 't, 'a> {
     }
 }
 
-impl<'s, 't, 'a> Parser for LRkParser<'s, 't, 'a> {
+impl<'aut, 's, 't, 'a> Parser for LRkParser<'aut, 's, 't, 'a> {
     fn parse(&mut self) {
         let mut kernel_maybe = self.get_next_token();
         loop {

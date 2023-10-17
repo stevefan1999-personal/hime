@@ -75,7 +75,7 @@ pub struct LexerData<'s, 't, 'a> {
     /// The repository for errors
     pub errors: &'a mut ParseErrors<'s>,
     /// The DFA automaton for this lexer
-    pub automaton: Automaton,
+    pub automaton: Automaton<'a>,
     /// Whether the lexer has run yet
     pub has_run: bool,
     /// Symbol ID of the SEPARATOR terminal

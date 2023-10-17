@@ -17,8 +17,6 @@
 
 //! Module for binary manipulation APIs
 
-use alloc::vec::Vec;
-
 /// Reads a `u16` from an array of bytes
 ///
 /// # Panics
@@ -49,22 +47,16 @@ pub fn read_u32(buffer: &[u8], index: usize) -> u32 {
     u32::from_le_bytes(*bytes)
 }
 
-/// Reads a table of u16 from a byte buffer
+/// Converts a slice of bytes to slice of Ts, and return error if
 #[must_use]
-pub fn read_table_u16(buffer: &[u8], start: usize, count: usize) -> Vec<u16> {
-    let mut result = Vec::with_capacity(count);
-    for i in 0..count {
-        result.push(read_u16(buffer, start + i * 2));
+pub fn read_table<'a, T>(buffer: &'a [u8], count: usize) -> Result<&'a [T], ()> {
+    let buffer = &buffer[..count * core::mem::size_of::<T>()];
+    // SAFETY: we will guarantee that only prefix and suffix have no item (so data is fully consumed)
+    //  we will return the data, otherwise error
+    let (prefix, data, suffix) = unsafe { buffer.align_to::<T>() };
+    if prefix.len() == 0 && suffix.len() == 0 {
+        Ok(data)
+    } else {
+        Err(())
     }
-    result
-}
-
-/// Reads a table of u32 from a byte buffer
-#[must_use]
-pub fn read_table_u32(buffer: &[u8], start: usize, count: usize) -> Vec<u32> {
-    let mut result = Vec::with_capacity(count);
-    for i in 0..count {
-        result.push(read_u32(buffer, start + i * 4));
-    }
-    result
 }

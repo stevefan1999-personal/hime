@@ -22,7 +22,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use super::{
-    get_op_code_base, get_op_code_tree_action, read_table_u16, read_u16, read_u32, ContextProvider,
+    get_op_code_base, get_op_code_tree_action, read_table, read_u16, read_u32, ContextProvider,
     LRAction, LRColumnMap, LRContexts, LRExpected, LRProduction, Parser, Symbol, TreeAction,
     LR_ACTION_CODE_ACCEPT, LR_ACTION_CODE_REDUCE, LR_ACTION_CODE_SHIFT,
     LR_OP_CODE_BASE_ADD_NULLABLE_VARIABLE, LR_OP_CODE_BASE_ADD_VIRTUAL,
@@ -51,7 +51,7 @@ struct RNGLRAutomatonCell {
 
 /// Represents the RNGLR parsing table and productions
 #[derive(Clone)]
-pub struct RNGLRAutomaton {
+pub struct RNGLRAutomaton<'a> {
     /// Index of the axiom variable
     axiom: usize,
     /// The number of columns in the LR table
@@ -65,17 +65,17 @@ pub struct RNGLRAutomaton {
     /// The RNGLR table
     cells: Vec<RNGLRAutomatonCell>,
     /// The LR action table
-    table: Vec<u16>,
+    table: &'a [u16],
     /// The table of LR productions
-    productions: Vec<LRProduction>,
+    productions: Vec<LRProduction<'a>>,
     /// The table of nullable variables
-    nullables: Vec<u16>,
+    nullables: &'a [u16],
 }
 
-impl RNGLRAutomaton {
+impl<'a> RNGLRAutomaton<'a> {
     /// Initializes a new automaton from the given binary data
     #[must_use]
-    pub fn new(data: &[u8]) -> RNGLRAutomaton {
+    pub fn new(data: &'a [u8]) -> RNGLRAutomaton<'a> {
         // read basic counters
         let axiom_index = read_u16(data, 0) as usize;
         let columns_count = read_u16(data, 2) as usize;
@@ -108,7 +108,7 @@ impl RNGLRAutomaton {
             index += 6;
         }
         // read the actions table for the automaton
-        let table = read_table_u16(data, index, actions_count * 2);
+        let table = read_table(&data[index..], actions_count * 2).unwrap();
         index += actions_count * 4;
         // read the production table
         let mut productions = Vec::with_capacity(productions_count);
@@ -117,7 +117,7 @@ impl RNGLRAutomaton {
             productions.push(production);
         }
         // read the nullables table
-        let nullables = read_table_u16(data, index, nullables_count);
+        let nullables = read_table(&data[index..], nullables_count).unwrap();
         // index += nullables_count * 2;
         // assert_eq!(index, data.len());
         RNGLRAutomaton {
@@ -1064,9 +1064,9 @@ struct RNGLRShift {
     to: usize,
 }
 
-struct RNGLRParserData<'s, 'a> {
+struct RNGLRParserData<'aut, 's, 'a> {
     /// The parser's automaton
-    automaton: RNGLRAutomaton,
+    automaton: RNGLRAutomaton<'aut>,
     /// The GSS for this parser
     gss: GSS,
     /// The next token
@@ -1081,7 +1081,7 @@ struct RNGLRParserData<'s, 'a> {
     actions: &'a mut dyn FnMut(usize, Symbol, &dyn SemanticBody),
 }
 
-impl<'s, 'a> ContextProvider for RNGLRParserData<'s, 'a> {
+impl<'aut, 's, 'a> ContextProvider for RNGLRParserData<'aut, 's, 'a> {
     /// Gets the priority of the specified context required by the specified terminal
     /// The priority is an unsigned integer. The lesser the value the higher the priority.
     /// The absence of value represents the unavailability of the required context.
@@ -1294,7 +1294,7 @@ impl<'s, 'a> ContextProvider for RNGLRParserData<'s, 'a> {
     }
 }
 
-impl<'s, 'a> RNGLRParserData<'s, 'a> {
+impl<'aut, 's, 'a> RNGLRParserData<'aut, 's, 'a> {
     /// Gets the terminal's identifier for the next token
     fn get_next_token_id(&self) -> u32 {
         match self.next_token.as_ref() {
@@ -1484,25 +1484,25 @@ impl<'s, 'a> RNGLRParserData<'s, 'a> {
 }
 
 /// Represents a base for all RNGLR parsers
-pub struct RNGLRParser<'s, 't, 'a, 'l> {
+pub struct RNGLRParser<'aut, 's, 't, 'a, 'l> {
     /// The parser's data
-    data: RNGLRParserData<'s, 'a>,
+    data: RNGLRParserData<'aut, 's, 'a>,
     /// The AST builder
     builder: SPPFBuilder<'s, 't, 'a, 'l>,
     /// The sub-trees for the constant nullable variables
     nullables: Vec<usize>,
 }
 
-impl<'s, 't, 'a, 'l> RNGLRParser<'s, 't, 'a, 'l> {
+impl<'aut, 's, 't, 'a, 'l> RNGLRParser<'aut, 's, 't, 'a, 'l> {
     /// Initializes a new instance of the parser
     pub fn new_with_ast(
         lexer: &'l mut Lexer<'s, 't, 'a>,
         variables: &'a [Symbol<'s>],
         virtuals: &'a [Symbol<'s>],
-        automaton: RNGLRAutomaton,
+        automaton: RNGLRAutomaton<'aut>,
         ast: &'a mut AstImpl,
         actions: &'a mut dyn FnMut(usize, Symbol, &dyn SemanticBody),
-    ) -> RNGLRParser<'s, 't, 'a, 'l> {
+    ) -> RNGLRParser<'aut, 's, 't, 'a, 'l> {
         let mut parser = RNGLRParser {
             data: RNGLRParserData {
                 automaton,
@@ -1531,10 +1531,10 @@ impl<'s, 't, 'a, 'l> RNGLRParser<'s, 't, 'a, 'l> {
         lexer: &'l mut Lexer<'s, 't, 'a>,
         variables: &'a [Symbol<'s>],
         virtuals: &'a [Symbol<'s>],
-        automaton: RNGLRAutomaton,
+        automaton: RNGLRAutomaton<'aut>,
         sppf: &'a mut SppfImpl,
         actions: &'a mut dyn FnMut(usize, Symbol, &dyn SemanticBody),
-    ) -> RNGLRParser<'s, 't, 'a, 'l> {
+    ) -> RNGLRParser<'aut, 's, 't, 'a, 'l> {
         let mut parser = RNGLRParser {
             data: RNGLRParserData {
                 automaton,
@@ -1563,7 +1563,7 @@ impl<'s, 't, 'a, 'l> RNGLRParser<'s, 't, 'a, 'l> {
         builder: &mut SPPFBuilder<'s, 't, 'a, 'l>,
         actions: &mut dyn FnMut(usize, Symbol, &dyn SemanticBody),
         nullables: &mut [usize],
-        automaton: &RNGLRAutomaton,
+        automaton: &'aut RNGLRAutomaton<'aut>,
         variables: &[Symbol],
     ) {
         // Get the dependency table
@@ -1919,7 +1919,7 @@ impl<'s, 't, 'a, 'l> RNGLRParser<'s, 't, 'a, 'l> {
     }
 }
 
-impl<'s, 't, 'a, 'l> Parser for RNGLRParser<'s, 't, 'a, 'l> {
+impl<'aut, 's, 't, 'a, 'l> Parser for RNGLRParser<'aut, 's, 't, 'a, 'l> {
     fn parse(&mut self) {
         let mut generation = self.data.gss.create_generation();
         let state0 = self.data.gss.create_node(0);

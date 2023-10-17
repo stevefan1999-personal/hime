@@ -25,7 +25,7 @@ use alloc::vec::Vec;
 
 use crate::lexers::ContextProvider;
 use crate::symbols::Symbol;
-use crate::utils::bin::{read_table_u16, read_u16, read_u32};
+use crate::utils::bin::{read_table, read_u16, read_u32};
 
 /// The maximum number of errors
 pub const MAX_ERROR_COUNT: usize = 100;
@@ -242,7 +242,7 @@ impl<'a> LRAction<'a> {
 /// --- production's bytecode
 /// array of `LROpCode`
 #[derive(Clone)]
-pub struct LRProduction {
+pub struct LRProduction<'a> {
     /// Index of the rule's head in the parser's array of variables
     pub head: usize,
     /// Action of the rule's head (replace or not)
@@ -250,12 +250,12 @@ pub struct LRProduction {
     /// Size of the rule's body by only counting terminals and variables
     pub reduction_length: usize,
     /// Bytecode for the rule's production
-    pub bytecode: Vec<LROpCode>,
+    pub bytecode: &'a [LROpCode],
 }
 
-impl LRProduction {
+impl<'a> LRProduction<'a> {
     /// Creates and loads a production
-    pub fn new(data: &[u8], index: &mut usize) -> LRProduction {
+    pub fn new(data: &'a [u8], index: &mut usize) -> LRProduction<'a> {
         let head = read_u16(data, *index) as usize;
         *index += 2;
         let head_action = u16::from(data[*index]);
@@ -264,10 +264,7 @@ impl LRProduction {
         *index += 1;
         let bytecode_length = data[*index] as usize;
         *index += 1;
-        let mut bytecode = Vec::with_capacity(bytecode_length);
-        for i in 0..bytecode_length {
-            bytecode.push(read_u16(data, *index + i * 2));
-        }
+        let bytecode = read_table(&data[*index..], bytecode_length).unwrap();
         *index += bytecode_length * 2;
         LRProduction {
             head,

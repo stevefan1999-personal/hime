@@ -37,7 +37,7 @@
 //! ```
 
 #![no_std]
-#![forbid(unsafe_code)]
+#![deny(clippy::undocumented_unsafe_blocks)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::cast_possible_truncation, clippy::module_name_repetitions)]
 #![warn(

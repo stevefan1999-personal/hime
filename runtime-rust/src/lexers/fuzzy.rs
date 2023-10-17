@@ -84,7 +84,7 @@ impl FuzzyMatcherHead {
 /// When multiple solutions are at the same Levenshtein distance to the input, the longest one is preferred.
 pub struct FuzzyMatcher<'s, 't, 'a> {
     /// This lexer's automaton
-    automaton: &'a Automaton,
+    automaton: &'a Automaton<'a>,
     /// Terminal index of the SEPARATOR terminal
     separator: u32,
     /// The input text

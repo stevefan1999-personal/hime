@@ -17,10 +17,8 @@
 
 //! Module for lexers' automata
 
-use alloc::vec::Vec;
-
 use crate::text::{Text, Utf16C};
-use crate::utils::bin::{read_table_u16, read_table_u32, read_u32};
+use crate::utils::bin::{read_table, read_u32};
 
 /// Identifier of an invalid state in an automaton
 pub const DEAD_STATE: u32 = 0xFFFF;
@@ -167,23 +165,23 @@ impl<'a> AutomatonState<'a> {
 /// u32: offset of the state from the beginning of the states table in number of u16
 /// -- states table
 #[derive(Clone, Default)]
-pub struct Automaton {
+pub struct Automaton<'a> {
     /// Table of indices in the states table
-    table: Vec<u32>,
+    table: &'a [u32],
     /// Lexer's DFA table of states
-    states: Vec<u16>,
+    states: &'a [u16],
     /// The number of states in the automaton
     states_count: usize,
 }
 
-impl Automaton {
+impl<'a> Automaton<'a> {
     /// Initializes a new automaton from the given binary data
     #[must_use]
-    pub fn new(data: &[u8]) -> Automaton {
+    pub fn new(data: &'a [u8]) -> Automaton<'a> {
         let states_count = read_u32(data, 0) as usize;
-        let table = read_table_u32(data, 4, states_count);
+        let table = read_table(&data[4..], states_count).unwrap();
         let rest = (data.len() - 4 - states_count * 4) / 2;
-        let states = read_table_u16(data, 4 + states_count * 4, rest);
+        let states = read_table(&data[4 + states_count * 4..], rest).unwrap();
         Automaton {
             table,
             states,

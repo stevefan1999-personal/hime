@@ -75,7 +75,7 @@ impl<'s, 't, 'a> ContextFreeLexer<'s, 't, 'a> {
     pub fn new(
         repository: TokenRepository<'s, 't, 'a>,
         errors: &'a mut ParseErrors<'s>,
-        automaton: Automaton,
+        automaton: Automaton<'a>,
         separator_id: u32,
     ) -> ContextFreeLexer<'s, 't, 'a> {
         ContextFreeLexer {
@@ -168,7 +168,7 @@ impl<'s, 't, 'a> ContextSensitiveLexer<'s, 't, 'a> {
     pub fn new(
         repository: TokenRepository<'s, 't, 'a>,
         errors: &'a mut ParseErrors<'s>,
-        automaton: Automaton,
+        automaton: Automaton<'a>,
         separator_id: u32,
     ) -> ContextSensitiveLexer<'s, 't, 'a> {
         ContextSensitiveLexer {
