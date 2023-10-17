@@ -470,7 +470,7 @@ fn write_code_ast_visitor(
     expected: &TerminalSet,
 ) -> Result<(), Error> {
     writeln!(writer)?;
-    writeln!(writer, "/// Visitor interface")?;
+    writeln!(writer, "/// AST Visitor interface")?;
     writeln!(writer, "#[allow(unused_variables)]")?;
     writeln!(writer, "pub trait AstVisitor {{")?;
     for terminal_ref in &expected.content {
